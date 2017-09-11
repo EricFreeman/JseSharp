@@ -43,9 +43,15 @@
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="UnityEventAggregator">
+      <HintPath>lib\UnityEventAggregator.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Miner.cs" />
+    <Compile Include="Models\Messages\HashSubmittedEvent.cs" />
+    <Compile Include="Models\Messages\NewBlockEvent.cs" />
+    <Compile Include="Models\Messages\StartMiningEvent.cs" />
     <Compile Include="Models\Request\SubmissionRequest.cs" />
     <Compile Include="Models\Response\StartNewBlockData.cs" />
     <Compile Include="Models\Response\StartNewBlockResponse.cs" />

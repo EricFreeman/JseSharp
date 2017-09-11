@@ -6,13 +6,52 @@ using Newtonsoft.Json.Linq;
 using RestSharp;
 using System.Security.Cryptography;
 using System.Text;
+using JseCoinMiner.Models.Messages;
 using JseCoinMiner.Models.Request;
+using UnityEventAggregator;
 
 namespace JseCoinMiner
 {
     public class Miner
     {
-        public void StartNewBlock()
+        private string UniqId;
+
+        public void Start()
+        {
+            EventAggregator.SendMessage(new StartMiningEvent());
+            while (true)
+            {
+                try
+                {
+                    UniqId = GenerateUniqueId();
+                    Console.WriteLine("Starting to mine: " + UniqId);
+                    StartNewBlock();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Oops, something broke! Starting over.\r\n" + e.Message);
+                    UniqId = GenerateUniqueId();
+                }
+            }
+        }
+
+        private string GenerateUniqueId()
+        {
+            var uniq = new StringBuilder("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+            int length = uniq.Length;
+            var random = new Random();
+            for (int i = length - 1; i > 0; i--)
+            {
+                int j = random.Next(i);
+                char temp = uniq[j];
+                uniq[j] = uniq[i];
+                uniq[i] = temp;
+            }
+
+            return uniq.ToString().Substring(0, 20);
+        }
+
+        private void StartNewBlock()
         {
             var client = new RestClient("https://jsecoin.com/server/request/");
             var request = new RestRequest(Method.POST);
@@ -25,17 +64,18 @@ namespace JseCoinMiner
             var data = root["data"].ToString();
             response.Content = JsonConvert.DeserializeObject<List<StartNewBlockData>>(data);
 
-            StartMining(response);
+            EventAggregator.SendMessage(new NewBlockEvent());
+            MineBlock(response);
         }
 
-        private float _hashRate = 500;
+        private float _hashRate = 1500;
         private bool _found;
-        public void StartMining(StartNewBlockResponse currentBlock)
+        private void MineBlock(StartNewBlockResponse currentBlock)
         {
             _found = false;
             var difficulty = currentBlock.Difficulty;
             var random = new Random();
-            var startNumber = (long) Math.Floor(random.Next() * 99999999f);
+            var startNumber = random.Next(99999999);
             for (var x = startNumber; x <= startNumber + _hashRate && !_found; x++)
             {
                 currentBlock.Nonce = x;
@@ -46,28 +86,38 @@ namespace JseCoinMiner
             StartNewBlock();
         }
 
-        public void ProcessHash(string hash, long nonce, int difficulty, StartNewBlockResponse block)
+        private void ProcessHash(string hash, long nonce, int difficulty, StartNewBlockResponse block)
         {
             if (hash.Substring(0, 4) == "0000")
             {
                 _found = true;
                 var submission = new SubmissionRequest
                 {
-                    Block = block.Block,
-                    Hash = hash,
-                    Nonce = nonce,
+                    block = block.Block,
+                    hash = hash.ToLower(),
+                    nonce = nonce.ToString(),
+                    uniq = UniqId
                 };
 
                 var client = new RestClient("https://jsecoin.com/server/submit/");
                 var request = new RestRequest(Method.POST);
-                request.AddBody(JsonConvert.SerializeObject(submission));
+                var body = JsonConvert.SerializeObject(submission);
+                request.AddHeader("Content-type", "application/x-www-form-urlencoded");
+                request.AddParameter("o", body);
+
+                Console.WriteLine(body);
+
                 var response = client.Execute(request);
-                Console.WriteLine("Yoooo, we got another .01, fam!");
+
+                EventAggregator.SendMessage(new HashSubmittedEvent());
+
+                Console.WriteLine(response.Content);
+
                 StartNewBlock();
             }
         }
 
-        public string Hex(byte[] buffer)
+        private string Hex(byte[] buffer)
         {
             var hexCodes = new List<string>();
 
@@ -85,7 +135,7 @@ namespace JseCoinMiner
             return String.Join("", hexCodes.ToArray());
         }
 
-        public string DecimalToArbitrarySystem(uint decimalNumber, int radix)
+        private string DecimalToArbitrarySystem(uint decimalNumber, int radix)
         {
             const int BitsInLong = 64;
             const string Digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";

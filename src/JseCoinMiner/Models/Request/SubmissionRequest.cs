@@ -2,10 +2,12 @@
 {
     public class SubmissionRequest
     {
-        public long Block;
-        public string Hash;
-        public long Nonce;
-        public int UserId = 446;
-        public string SiteId = "c#miner";
+        public long block;
+        public string hash;
+        public string nonce;
+        public string pubid = "446";
+        public string siteid = "csharpminer.com";
+        public string subid = "666";
+        public string uniq;
     }
 }
